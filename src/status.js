@@ -13,7 +13,7 @@ export function isMetricCritical(key, value) {
 }
 
 export function zoneStatus(reading) {
-  if (!reading) return "unknown";
+  if (!reading || !Object.keys(METRICS).every((key) => Number.isFinite(reading[key]))) return "unknown";
   const critical = Object.keys(METRICS).some((key) => isMetricCritical(key, reading[key]));
   return critical ? "critical" : "good";
 }

@@ -1,124 +1,69 @@
-import { useNavigate } from "react-router-dom";
-import { zoneStatus } from "../status";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { METRICS, zoneStatus } from "../status";
+import terrain from "../assets/cafetal-terrain.png";
 
-const TILE_W = 90;
-const TILE_H = 45;
-const DEPTH = 22;
-const ORIGIN = { x: 200, y: 55 };
-
-// Diamond grid: screen position of a (col, row) isometric tile.
-function tileCenter(col, row) {
-  return {
-    x: ORIGIN.x + (col - row) * TILE_W,
-    y: ORIGIN.y + (col + row) * TILE_H,
-  };
-}
-
-function diamondPoints(cx, cy) {
-  const w = TILE_W;
-  const h = TILE_H;
-  return [
-    [cx, cy - h],
-    [cx + w, cy],
-    [cx, cy + h],
-    [cx - w, cy],
-  ];
-}
-
-function toPointsAttr(points) {
-  return points.map(([x, y]) => `${x},${y}`).join(" ");
-}
-
-function IsoTile({ col, row, fillVar, onClick, faded }) {
-  const { x: cx, y: cy } = tileCenter(col, row);
-  const [top, right, bottom, left] = diamondPoints(cx, cy);
-
-  return (
-    <g
-      className="iso-plot"
-      onClick={onClick}
-      style={{ opacity: faded ? 0.5 : 1 }}
-    >
-      {/* left face (extruded down) */}
-      <polygon
-        className="iso-face"
-        points={toPointsAttr([left, bottom, [bottom[0], bottom[1] + DEPTH], [left[0], left[1] + DEPTH]])}
-        style={{ fill: fillVar, filter: "brightness(0.75)" }}
-      />
-      {/* right face (extruded down) */}
-      <polygon
-        className="iso-face"
-        points={toPointsAttr([right, bottom, [bottom[0], bottom[1] + DEPTH], [right[0], right[1] + DEPTH]])}
-        style={{ fill: fillVar, filter: "brightness(0.88)" }}
-      />
-      {/* top face */}
-      <polygon
-        className="iso-top"
-        points={toPointsAttr([top, right, bottom, left])}
-        style={{ fill: fillVar }}
-      />
-    </g>
-  );
-}
-
-function Deco({ col, row, size = 5 }) {
-  const { x, y } = tileCenter(col, row);
-  return <circle className="iso-deco" cx={x} cy={y} r={size} />;
-}
-
-const ZONE_TILES = [
-  { col: 0, row: 0 },
-  { col: 1, row: 0 },
-  { col: 0, row: 1 },
-  { col: 1, row: 1 },
-];
+const PLOTS = {
+  "lote-1": { x: 7, y: 8, name: "Zona Norte" },
+  "lote-2": { x: 53, y: 8, name: "Zona Este" },
+  "lote-3": { x: 7, y: 51, name: "Zona Sur" },
+  "lote-4": { x: 53, y: 51, name: "Zona Oeste" },
+};
+const LABELS = { good: "En rango", critical: "Fuera de rango", unknown: "Sin datos" };
+const valueText = (value, unit) => Number.isFinite(value) ? `${value}${unit}` : "—";
 
 export default function FarmMap({ zones, readings }) {
-  const navigate = useNavigate();
-
+  const [selectedId, setSelectedId] = useState(zones[0]?.id);
+  const selected = zones.find((zone) => zone.id === selectedId) || zones[0];
+  const reading = readings[selected?.id];
+  const status = zoneStatus(reading);
   return (
-    <div className="card">
-      <p className="section-title">Distribución del cafetal</p>
-      <svg
-        className="farm-map"
-        viewBox="0 0 400 260"
-        role="img"
-        aria-label="Mapa isométrico del cafetal con sus zonas"
-      >
-        <Deco col={-0.6} row={-0.6} size={7} />
-        <Deco col={1.9} row={-0.5} size={6} />
-        <Deco col={-0.6} row={1.9} size={6} />
-        <Deco col={1.9} row={1.9} size={7} />
-        <Deco col={0.5} row={-0.9} size={5} />
-
-        {zones.map((zone, i) => {
-          const reading = readings[zone.id];
-          const status = zoneStatus(reading);
-          const isCritical = status === "critical";
-          const tile = ZONE_TILES[i];
-          const { x, y } = tileCenter(tile.col, tile.row);
-
-          return (
-            <g key={zone.id}>
-              <IsoTile
-                col={tile.col}
-                row={tile.row}
-                fillVar={isCritical ? "var(--status-critical-bg)" : "var(--status-good-bg)"}
-                onClick={() => navigate(`/zone/${zone.id}`)}
-                faded={!reading}
-              />
-              <foreignObject x={x - 60} y={y - 16} width="120" height="40" style={{ pointerEvents: "none" }}>
-                <div style={{ textAlign: "center" }}>
-                  <div className="plot-label">{zone.name}</div>
-                  <div className="plot-value">
-                    {reading ? `${reading.humedad_suelo}% · ${reading.temperatura}°C` : "sin datos"}
-                  </div>
-                </div>
-              </foreignObject>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+    <section className="card farm-section" aria-label="Distribución del cafetal">
+      <div className="farm-heading">
+        <div><p className="section-title">Distribución del cafetal</p>
+          <p className="farm-subtitle">Selecciona una parcela para consultar sus sensores.</p></div>
+        <span className="farm-caption">Vista ilustrativa · 4 lotes</span>
+      </div>
+      <div className="farm-layout">
+        <div className="farm-scene">
+          <img src={terrain} alt="Cafetal con hileras de plantas y cuatro parcelas separadas por caminos" />
+          {zones.map((zone) => {
+            const plot = PLOTS[zone.id];
+            if (!plot) return null;
+            const data = readings[zone.id];
+            const state = zoneStatus(data);
+            return <button key={zone.id} type="button"
+              className={`farm-plot ${state} ${selected?.id === zone.id ? "is-selected" : ""}`}
+              style={{ left: `${plot.x}%`, top: `${plot.y}%` }}
+              aria-pressed={selected?.id === zone.id}
+              aria-label={`${plot.name}, ${LABELS[state]}, humedad de suelo ${valueText(data?.humedad_suelo, "%")}`}
+              onClick={() => setSelectedId(zone.id)}>
+              <span className="farm-marker"><span className="farm-dot" />{plot.name}
+                <strong>{valueText(data?.humedad_suelo, "%")}</strong><small>Humedad de suelo</small>
+              </span>
+            </button>;
+          })}
+          <span className="farm-scene-note">Terreno ilustrativo, no georreferenciado</span>
+        </div>
+        {selected && <aside className="farm-inspector" aria-label="Datos de la zona seleccionada">
+          <span className="farm-eyebrow">ZONA SELECCIONADA · {selected.id}</span>
+          <h2>{PLOTS[selected.id]?.name || selected.name}</h2>
+          <p className="farm-subtitle">{selected.name}</p>
+          <span className={`farm-state ${status}`}><span className="farm-dot" />{LABELS[status]}</span>
+          <dl className="farm-metrics">
+            {Object.entries(METRICS).map(([key, metric]) => <div key={key}>
+              <dt>{metric.label}</dt><dd>{valueText(reading?.[key], metric.unit)}</dd>
+            </div>)}
+          </dl>
+          <p className="farm-reading-time">{reading?.timestamp
+            ? `Lectura: ${new Date(reading.timestamp * 1000).toLocaleString("es-CO")}`
+            : "Sin lectura disponible. Comprueba el simulador o la conexión."}</p>
+          <Link className="farm-detail-link" to={`/zone/${selected.id}`}>Ver historial de la zona →</Link>
+        </aside>}
+      </div>
+      <div className="farm-footer"><div className="farm-legend">
+        {Object.entries(LABELS).map(([key, label]) => <span className={key} key={key}><i className="farm-dot" />{label}</span>)}
+      </div><span>Datos de la API · actualización cada 30 s</span></div>
+    </section>
   );
 }

@@ -10,7 +10,10 @@ export const ZONES = [
 export const HUMIDITY_CRITICAL_BELOW = 40;
 
 async function request(path, options) {
-  const response = await fetch(`${API_URL}${path}`, options);
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    signal: AbortSignal.timeout(15000),
+  });
   if (!response.ok) {
     throw new Error(`${path} -> HTTP ${response.status}`);
   }
