@@ -63,7 +63,7 @@ export default function FarmMap({ zones, readings }) {
       </div>
       <div className="farm-footer"><div className="farm-legend">
         {Object.entries(LABELS).map(([key, label]) => <span className={key} key={key}><i className="farm-dot" />{label}</span>)}
-      </div><span>Datos de la API · actualización cada 30 s</span></div>
+      </div><span>Datos de la API · se actualiza solo, y solo mientras la EC2 esté encendida</span></div>
     </section>
   );
 }
