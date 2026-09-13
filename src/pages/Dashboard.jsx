@@ -5,7 +5,14 @@ import TrendChart from "../components/TrendChart";
 import AlertsPanel from "../components/AlertsPanel";
 import FarmMap from "../components/FarmMap";
 
-export default function Dashboard({ readings, histories, dataLoading, lastUpdated, onRefresh }) {
+export default function Dashboard({
+  readings,
+  histories,
+  dataLoading,
+  lastUpdated,
+  onRefresh,
+  autoRefreshActive = true,
+}) {
   const soilValues = ZONES.map((z) => readings[z.id]?.humedad_suelo).filter(
     (v) => v !== undefined && v !== null
   );
@@ -19,6 +26,16 @@ export default function Dashboard({ readings, histories, dataLoading, lastUpdate
 
   return (
     <div>
+      {!autoRefreshActive && (
+        <div
+          className="card"
+          style={{ marginBottom: 16, padding: "10px 16px", fontSize: 13.5 }}
+        >
+          ⏸ Actualización automática pausada tras 5 minutos — usa "Refrescar datos" para
+          traer lecturas nuevas.
+        </div>
+      )}
+
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
         {ZONES.map((zone) => (
           <ZoneCard key={zone.id} id={zone.id} name={zone.name} reading={readings[zone.id]} />
