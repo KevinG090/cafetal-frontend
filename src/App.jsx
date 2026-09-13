@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import ZoneDetail from "./pages/ZoneDetail";
 
 const POLL_INTERVAL_MS = 60000; // solo revisa estado cada minuto
+const MAX_AUTO_REFRESH_MS = 5 * 60 * 1000; // corta el polling automatico tras 5 min prendido
 const HISTORY_WINDOW_SEC = 24 * 60 * 60;
 
 export default function App() {
@@ -16,7 +17,9 @@ export default function App() {
   const [histories, setHistories] = useState({});
   const [dataLoading, setDataLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [autoRefreshActive, setAutoRefreshActive] = useState(true);
   const refreshing = useRef(false);
+  const mountedAtRef = useRef(Date.now());
   // Cache en memoria: solo se pide lo nuevo desde la ultima lectura conocida,
   // en vez de volver a traer las 24h completas en cada ciclo.
   const cacheRef = useRef({});
@@ -81,6 +84,15 @@ export default function App() {
 
     const timer = window.setInterval(async () => {
       if (document.hidden) return;
+      // Corta el polling automatico despues de MAX_AUTO_REFRESH_MS -
+      // evita dejar la EC2/Lambdas recibiendo trafico indefinidamente
+      // si alguien deja la pestana abierta. Solo el boton "Refrescar
+      // datos" vuelve a consultar despues de este punto.
+      if (Date.now() - mountedAtRef.current >= MAX_AUTO_REFRESH_MS) {
+        window.clearInterval(timer);
+        setAutoRefreshActive(false);
+        return;
+      }
       const current = await refreshStatus();
       // Si esta apagada no hay datos nuevos que traer - no vale la pena
       // seguir consultando data-api/DynamoDB cada minuto por nada.
@@ -89,6 +101,11 @@ export default function App() {
       }
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
+  }, [refreshStatus, refreshData]);
+
+  const handleManualRefresh = useCallback(async () => {
+    await refreshStatus();
+    await refreshData();
   }, [refreshStatus, refreshData]);
 
   async function handleControlChange(busy) {
@@ -118,7 +135,8 @@ export default function App() {
               histories={histories}
               dataLoading={dataLoading}
               lastUpdated={lastUpdated}
-              onRefresh={refreshData}
+              onRefresh={handleManualRefresh}
+              autoRefreshActive={autoRefreshActive}
             />
           }
         />
